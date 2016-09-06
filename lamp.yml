@@ -4,18 +4,22 @@
   sudo: yes
   gather_facts: no
   connection: ssh
+  vars_prompt:
+  - name: my_url
+    prompt: Please enter drual download URL 
+    default: https://ftp.drupal.org/files/projects/drupal-7.50.tar.gz
   tasks:
   - name: Install httpd
     yum: name=httpd state=latest
     notify: 
     - Restart httpd
   - name: Install mariadb
-    yum: state=present name={{ item }}
+    yum: state=latest name={{ item }}
     with_items:
     - mariadb
     - mariadb-server
-    notify:
-    - Installed mariadb
+  - name: Restart mariadb
+    service: name=mariadb state=started enabled=yes
   - name: Install wget
     yum: state=present name=wget
   - name: Install php and related modules
@@ -32,9 +36,13 @@
     notify:
     - Restart httpd
   - name: Drupal download and extract 
-    raw: rm -fr /var/www/html; cd /var/www; wget -O /var/www/drupal-7.50.tar.gz https://ftp.drupal.org/files/projects/drupal-7.50.tar.gz; tar xvfz /var/www/drupal-7.50.tar.gz; rm /var/www/drupal-7.50.tar.gz; mv /var/www/drupal-7.50 /var/www/html; mkdir /var/www/html/sites/default/files; cp /var/www/html/sites/default/default.settings.php /var/www/html/sites/default/settings.php; chmod -R 777 /var/www/html/sites/default
+    raw: rm -fr /var/www/html; cd /var/www; wget -O /var/www/drupal.tar.gz {{ my_url }}; tar xvfz /var/www/drupal.tar.gz; rm /var/www/drupal.tar.gz; mv /var/www/drupal* /var/www/html; mkdir /var/www/html/sites/default/files; cp /var/www/html/sites/default/default.settings.php /var/www/html/sites/default/settings.php; chmod -R 777 /var/www/html/sites/default
+  - name: Install Drush
+    raw: php -r "readfile('https://s3.amazonaws.com/files.drush.org/drush.phar');" > /home/centos/drush; chmod +x /home/centos/drush; mv /home/centos/drush /usr/local/bin
+  - name: Create Database
+    raw: mysql -uroot -e "create database drupal;"
+  - name: Create User
+    raw: mysql -uroot -e "GRANT ALL PRIVILEGES on drupal.* to 'drupal'@'localhost' IDENTIFIED by 'drupal';"
   handlers:
   - name: Restart httpd
     service: name=httpd state=restarted enabled=yes 
-  - name: Installed mariadb
-    service: name=mariadb state=restarted enabled=yes
